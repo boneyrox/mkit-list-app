@@ -3,7 +3,6 @@ import Link from "next/link";
 
 const API_URL = "https://jsonplaceholder.typicode.com/posts";
 
-// getStaticProps remains the same as before
 export async function getStaticProps() {
   try {
     const res = await fetch(API_URL);
@@ -51,7 +50,6 @@ export default function HomePage({ initialPosts, error }) {
   };
 
   return (
-    // Apply Tailwind classes directly
     <div className="container mx-auto p-4 md:p-8 max-w-3xl">
       <h1 className="text-3xl md:text-4xl font-bold text-center mb-8 text-gray-800">
         Item Browser (JSONPlaceholder Posts)
