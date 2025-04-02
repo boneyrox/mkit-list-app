@@ -1,113 +1,122 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import { useRef } from "react";
+import { API_URL } from "@/constants";
+import PageLayout from "@/components/layout/PageLayout";
+import { SearchBar, FavoritesSummary, EmptyState } from "@/components/ui";
+import useFavorites from "@/hooks/useFavorites";
+import usePostFiltering from "@/hooks/usePostFiltering";
+import dynamic from "next/dynamic";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Dynamically import components that aren't needed immediately
+const PostItem = dynamic(() => import("@/components/ui/PostItem"), {
+  loading: () => (
+    <div className="animate-pulse h-24 bg-gray-100 rounded-md"></div>
+  ),
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// For components that are below the fold
+const ScrollToTopButton = dynamic(
+  () => import("@/components/ui/ScrollToTopButton"),
+  {
+    ssr: false, // Only load on client side
+  }
+);
 
-export default function Home() {
+export async function getStaticProps() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) {
+      console.error("Failed to fetch posts during build");
+      throw new Error(`Failed to fetch posts, status: ${res.status}`);
+    }
+    const posts = await res.json();
+    return { props: { initialPosts: posts } };
+  } catch (error) {
+    console.error("Error in getStaticProps:", error);
+    return { props: { initialPosts: [], error: error.message } };
+  }
+}
+
+export default function HomePage({ initialPosts, error }) {
+  // Refs
+  const mainContentRef = useRef(null);
+
+  // Custom hooks
+  const { favorites, announcement, toggleFavorite, getFavoritesCount } =
+    useFavorites();
+  const {
+    filter,
+    filteredPosts,
+    showOnlyFavorites,
+    handleFilterChange,
+    toggleShowOnlyFavorites,
+  } = usePostFiltering(initialPosts, favorites);
+
+  const skipToContent = () => {
+    mainContentRef.current?.focus();
+  };
+
+  // Error and empty states
+  if (error) {
+    return (
+      <div className="text-red-600 text-center p-8">
+        <h2 className="text-xl font-medium mb-2">Error fetching posts</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!initialPosts || (initialPosts.length === 0 && !error)) {
+    return (
+      <div className="container mx-auto p-8 text-center">
+        <p className="text-gray-600">No posts found or failed to load.</p>
+      </div>
+    );
+  }
+
+  const favoritesCount = getFavoritesCount();
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              pages/index.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+    <PageLayout
+      title="Item Browser - JSONPlaceholder Posts"
+      description="Browse and favorite posts from JSONPlaceholder"
+      mainRef={mainContentRef}
+      skipToContentHandler={skipToContent}
+      announcement={announcement}
+    >
+      <SearchBar
+        value={filter}
+        onChange={handleFilterChange}
+        showOnlyFavorites={showOnlyFavorites}
+        onToggleFavorites={toggleShowOnlyFavorites}
+      />
+
+      {favoritesCount > 0 && <FavoritesSummary count={favoritesCount} />}
+
+      <div className="sr-only" aria-live="polite">
+        {filteredPosts.length} posts displayed
+      </div>
+
+      <nav aria-label="Posts">
+        <ul
+          className="list-none p-0 space-y-3"
+          aria-label={showOnlyFavorites ? "Favorite posts" : "All posts"}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          {filteredPosts.length > 0 ? (
+            filteredPosts.map((post) => (
+              <PostItem
+                key={post.id}
+                post={post}
+                isFavorite={favorites[post.id]}
+                onToggleFavorite={toggleFavorite}
+              />
+            ))
+          ) : (
+            <EmptyState showOnlyFavorites={showOnlyFavorites} />
+          )}
+        </ul>
+      </nav>
+
+      <ScrollToTopButton />
+    </PageLayout>
   );
 }
