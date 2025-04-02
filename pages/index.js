@@ -1,14 +1,25 @@
 import { useRef } from "react";
 import { API_URL } from "@/constants";
 import PageLayout from "@/components/layout/PageLayout";
-import {
-  SearchBar,
-  PostItem,
-  FavoritesSummary,
-  EmptyState,
-} from "@/components/ui";
+import { SearchBar, FavoritesSummary, EmptyState } from "@/components/ui";
 import useFavorites from "@/hooks/useFavorites";
 import usePostFiltering from "@/hooks/usePostFiltering";
+import dynamic from "next/dynamic";
+
+// Dynamically import components that aren't needed immediately
+const PostItem = dynamic(() => import("@/components/ui/PostItem"), {
+  loading: () => (
+    <div className="animate-pulse h-24 bg-gray-100 rounded-md"></div>
+  ),
+});
+
+// For components that are below the fold
+const ScrollToTopButton = dynamic(
+  () => import("@/components/ui/ScrollToTopButton"),
+  {
+    ssr: false, // Only load on client side
+  }
+);
 
 export async function getStaticProps() {
   try {
@@ -104,6 +115,8 @@ export default function HomePage({ initialPosts, error }) {
           )}
         </ul>
       </nav>
+
+      <ScrollToTopButton />
     </PageLayout>
   );
 }
